@@ -1,7 +1,7 @@
 {
   "name": "cf-bypass",
   "version": "1.0.2",
-  "description": "cloudflare bypass by febry wesker",
+  "description": "cloudflare bypass by febry wesker.",
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
