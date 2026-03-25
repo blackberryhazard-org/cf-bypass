@@ -120,7 +120,7 @@ async function solve({ url, mode, timeout, proxy }) {
             });
         }
 
-        // navigasi
+        // nav
         await page.goto(url, {
             waitUntil: 'domcontentloaded',
             timeout
