@@ -30,7 +30,6 @@ RUN apt-get update && apt-get install -y \
 
 WORKDIR /app
 
-# chrome path
 ENV CHROME_PATH=/usr/bin/chromium
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
 
