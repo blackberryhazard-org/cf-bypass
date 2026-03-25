@@ -172,7 +172,7 @@ lebih cepat dibanding `full` mode. cocok untuk inject ke client (axios/fetch).
   <img src="https://cloud.yardansh.com/vItc1S.jpg" />
 </p>
 
-berguna untuk debug — memastikan challenge sudah terlewati. output berupa base64 image.
+berguna untuk debug. memastikan challenge sudah terlewati. output berupa base64 image.
 
 ---
 
@@ -181,7 +181,7 @@ berguna untuk debug — memastikan challenge sudah terlewati. output berupa base
 - max 2 concurrent solve
 - rate limit: 5 request / menit / ip
 - disarankan minimal 1GB RAM
-- `cf_clearance` bisa expired — regenerate jika perlu
+- `cf_clearance` bisa expired, regenerate jika perlu
 - gunakan hanya pada target yang benar-benar pakai cloudflare
 - hindari spam request
 
