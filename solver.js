@@ -63,17 +63,14 @@ async function waitForCFPass(page, timeout) {
 
 async function extractTurnstileToken(page) {
     return page.evaluate(() => {
-
         const input = document.querySelector('[name="cf-turnstile-response"]');
         if (input?.value) return input.value;
-
         if (window._cf_chl_opt?.cRay) return null;
-
         return window.__turnstileToken || null;
     });
 }
 
-async function solve({ url, mode, timeout, proxy }) {
+async function solve({ url, mode, timeout, proxy, targetUrl }) {
 
     timeout = timeout || 30000;
     mode = mode || 'full';
@@ -95,8 +92,7 @@ async function solve({ url, mode, timeout, proxy }) {
 
         await page.setExtraHTTPHeaders({
             'Accept-Language': 'en-US,en;q=0.9,id;q=0.8',
-            'Accept':
-                'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8'
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8'
         });
 
         let turnstileToken = null;
@@ -104,12 +100,9 @@ async function solve({ url, mode, timeout, proxy }) {
         if (mode === 'turnstile-min') {
 
             await page.setRequestInterception(true);
-
             page.on('request', req => req.continue());
-
             page.on('response', async response => {
                 const resUrl = response.url();
-
                 if (resUrl.includes('challenges.cloudflare.com/turnstile')) {
                     try {
                         const body = await response.text();
@@ -120,7 +113,94 @@ async function solve({ url, mode, timeout, proxy }) {
             });
         }
 
-        // nav
+        if (mode === 'turnstile-page') {
+            let ttoken = null;
+
+            // Intercept turnstile callback sebelum page load
+            await page.evaluateOnNewDocument(() => {
+                Object.defineProperty(window, 'turnstile', {
+                    get() { return this.__turnstileObj; },
+                    set(val) {
+                        if (val && typeof val.render === 'function') {
+                            const originalRender = val.render.bind(val);
+                            val.render = function(container, params) {
+                                if (params && typeof params.callback === 'function') {
+                                    const originalCallback = params.callback;
+                                    params.callback = function(token) {
+                                        window.__ttoken = token;
+                                        originalCallback(token);
+                                    };
+                                }
+                                return originalRender(container, params);
+                            };
+                        }
+                        this.__turnstileObj = val;
+                    },
+                    configurable: true
+                });
+            });
+
+            await page.goto(url, { waitUntil: 'networkidle2', timeout });
+            await waitForCFPass(page, timeout);
+
+            // Dismiss cookie consent popup
+            await page.evaluate(() => {
+                const buttons = [...document.querySelectorAll('button')];
+                const consentBtn = buttons.find(b =>
+                    b.textContent.trim().toLowerCase().includes('consent') ||
+                    b.textContent.trim().toLowerCase().includes('agree') ||
+                    b.textContent.trim().toLowerCase().includes('accept')
+                );
+                if (consentBtn) consentBtn.click();
+            }).catch(() => {});
+
+            await new Promise(r => setTimeout(r, 1000));
+
+            // Inject URL ke input dan klik download
+            if (targetUrl) {
+                await page.evaluate((u) => {
+                    const input = document.querySelector('input[type="text"], input[type="url"], #url, #link, .url-input');
+                    if (input) {
+                        input.value = u;
+                        input.dispatchEvent(new Event('input', { bubbles: true }));
+                        input.dispatchEvent(new Event('change', { bubbles: true }));
+                    }
+                }, targetUrl);
+
+                await new Promise(r => setTimeout(r, 500));
+
+                await page.evaluate(() => {
+                    const btn = document.querySelector('button[type="submit"], .download-btn, #download, button.btn');
+                    if (btn) btn.click();
+                });
+            }
+
+            // Tunggu ttoken
+            const deadline = Date.now() + 25000;
+            while (!ttoken && Date.now() < deadline) {
+                ttoken = await page.evaluate(() => window.__ttoken || null).catch(() => null);
+                if (!ttoken) await new Promise(r => setTimeout(r, 500));
+            }
+
+            if (!ttoken) throw new Error('Turnstile token tidak ditemukan');
+
+            const cookies = await page.cookies();
+            const cookieStr = cookies.map(c => `${c.name}=${c.value}`).join('; ');
+            const htmlToken = await page.evaluate(() => {
+                const el = document.querySelector('#token, input[name="token"]');
+                return el?.value || null;
+            }).catch(() => null);
+
+            return {
+                ttoken,
+                token: htmlToken,
+                cookies,
+                cookie: cookieStr,
+                user_agent: userAgent,
+            };
+        }
+
+        // nav untuk mode lainnya
         await page.goto(url, {
             waitUntil: 'domcontentloaded',
             timeout
@@ -130,7 +210,6 @@ async function solve({ url, mode, timeout, proxy }) {
 
         await new Promise(r => setTimeout(r, 1500));
 
-        // ngumpulin data
         const cookies = await page.cookies();
         const cfClearance = cookies.find(c => c.name === 'cf_clearance');
         const ua = await page.evaluate(() => navigator.userAgent);
