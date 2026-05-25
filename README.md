@@ -102,28 +102,98 @@ request body:
 curl -X POST http://localhost:3000/solve \
   -H "Content-Type: application/json" \
   -d '{
-    "url": "https://nowsecure.nl",
+    "url": "https://safelinku.com",
     "mode": "full"
   }'
 ```
 
-response:
+### response — `mode: full` (real output)
 
 ```json
 {
   "status": true,
   "data": {
-    "cookies": [...],
+    "cookies": [
+      {
+        "name": "cf_clearance",
+        "value": "ifdiTVGnYMVCan.bJf25A5xo_Sv.Jj8C_U36oThq1Nk-1779692826-1.2.1.1-...truncated...",
+        "domain": ".safelinku.com",
+        "path": "/",
+        "expires": 1811228826.577286,
+        "size": 417,
+        "httpOnly": true,
+        "secure": true,
+        "session": false,
+        "sameSite": "None",
+        "priority": "Medium",
+        "sourceScheme": "Secure",
+        "partitionKey": "https://safelinku.com"
+      },
+      {
+        "name": "SID",
+        "value": "QcbPCA2DuCGgNQDJ37eQZupLxNuImedGFCMxwOsc",
+        "domain": "safelinku.com",
+        "path": "/",
+        "expires": 1779779225.86031,
+        "size": 43,
+        "httpOnly": true,
+        "secure": false,
+        "session": false,
+        "sameSite": "Lax",
+        "priority": "Medium",
+        "sourceScheme": "Secure"
+      },
+      {
+        "name": "XSRF-TOKEN",
+        "value": "eyJpdiI6IjBLbEJyYVl6eE80VkZUK3hObVpaUnc9PSIsInZhbHVlIjoi...truncated...",
+        "domain": "safelinku.com",
+        "path": "/",
+        "expires": 1779779225.860152,
+        "size": 352,
+        "httpOnly": false,
+        "secure": true,
+        "session": false,
+        "sameSite": "Lax",
+        "priority": "Medium",
+        "sourceScheme": "Secure"
+      },
+      {
+        "name": "_ga_QSHLHEKBT5",
+        "value": "GS2.1.s1779692826$o1$g0$t1779692826$j60$l0$h0",
+        "domain": ".safelinku.com",
+        "path": "/",
+        "expires": 1814252826.143819,
+        "size": 59,
+        "httpOnly": false,
+        "secure": false,
+        "session": false,
+        "priority": "Medium",
+        "sourceScheme": "Secure"
+      },
+      {
+        "name": "_ga",
+        "value": "GA1.1.363019776.1779692826",
+        "domain": ".safelinku.com",
+        "path": "/",
+        "expires": 1814252826.14419,
+        "size": 29,
+        "httpOnly": false,
+        "secure": false,
+        "session": false,
+        "priority": "Medium",
+        "sourceScheme": "Secure"
+      }
+    ],
+    "cookie": "cf_clearance=ifdiTVGnYM...; SID=QcbPCA2DuC...; XSRF-TOKEN=eyJpdiI6...; _ga_QSHLHEKBT5=GS2.1.s1779692826...; _ga=GA1.1.363019776.1779692826",
+    "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+    "cf_clearance": "ifdiTVGnYMVCan.bJf25A5xo_Sv.Jj8C_U36oThq1Nk-1779692826-1.2.1.1-...truncated...",
     "headers": {
-      "user-agent": "Mozilla/5.0...",
-      "cookie": "cf_clearance=...",
-      "cf-clearance": "..."
+      "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+      "cookie": "cf_clearance=...; SID=...; XSRF-TOKEN=...; _ga=...",
+      "cf-clearance": "ifdiTVGnYMVCan.bJf25A5xo_Sv.Jj8C_U36oThq1Nk-1779692826-1.2.1.1-...truncated..."
     },
-    "cookie": "cf_clearance=...; __cflb=...",
-    "user_agent": "Mozilla/5.0...",
-    "cf_clearance": "...",
     "fingerprint": "win10-intel",
-    "elapsed_ms": 8432
+    "elapsed_ms": 7628
   }
 }
 ```
@@ -145,6 +215,67 @@ async function solveCF(url, mode = 'full') {
 const { headers } = await solveCF('https://example.com');
 // pakai headers buat axios/fetch next request
 ```
+
+---
+
+## mode notes
+
+penting — tiap mode return field yang beda, pilih sesuai use case.
+
+### `full`
+**return:** `cookies[]`, `cookie` (string siap pakai), `headers{}`, `user_agent`, `cf_clearance`, `fingerprint`, `elapsed_ms`
+
+session paling lengkap. cocok kalau lo mau replay request ke target site (axios/fetch) pakai cookie + user-agent yang sama persis dengan browser yang udah solve challenge. `headers.cookie` udah di-join siap masuk ke `Cookie:` header.
+
+**catatan:**
+- `cf_clearance` valid hanya untuk kombinasi (IP + user_agent + accept-language). kalau request berikutnya beda salah satu → ditolak.
+- pakai `headers` apa adanya, jangan utak-atik UA.
+- cookie lain di `cookies[]` (SID, XSRF-TOKEN, dll) berasal dari target — bawa juga kalau target butuh login state.
+
+---
+
+### `cf_clearance`
+**return:** `cf_clearance`, `user_agent`, `fingerprint`, `elapsed_ms`
+
+versi ringan dari `full`. cuma keluarin `cf_clearance` cookie + user agent. cocok kalau lo cuma butuh tembus CF challenge dan gak butuh cookie aplikasi target (SID, csrf token, dll).
+
+**catatan:**
+- selalu pasang `cf_clearance` ke `Cookie: cf_clearance=<value>` header.
+- harus pair sama `user_agent` — kalau UA beda, cookie ditolak.
+
+---
+
+### `turnstile-min`
+**return:** `token`, `user_agent`, `fingerprint`, `elapsed_ms`
+
+ambil Turnstile token saja (yang biasanya di-submit ke form sebagai `cf-turnstile-response`). cara kerjanya nge-hook `window.turnstile.render` lalu intercept callback token-nya.
+
+**catatan:**
+- token Turnstile **sekali pakai** (one-shot), expired dalam ~5 menit.
+- cuma jalan di site yang expose `window.turnstile` global (situs yang explicit pakai widget Turnstile, bukan managed challenge biasa).
+- kalau site cuma kasih managed CF challenge tanpa widget turnstile, mode ini bakal timeout → pakai `cf_clearance` aja.
+
+---
+
+### `screenshot`
+**return:** `screenshot` (base64 PNG, viewport 1366×768), `cookies[]`, `user_agent`, `fingerprint`, `elapsed_ms`
+
+screenshot halaman setelah navigation selesai. dipakai untuk debug — lihat apakah challenge benar-benar terlewati, apakah ada CAPTCHA yang macet, atau apakah ada blokir lain.
+
+**catatan:**
+- tidak otomatis `waitCFClear` — kalau lagi challenge, hasilnya bisa "Just a moment..." page. itu sengaja, biar bisa lihat state mentah.
+- ukuran response besar (~300–500KB base64 per request). jangan dipakai untuk produksi rutin.
+
+---
+
+### perbandingan singkat
+
+| mode | output utama | one-shot? | size response | use case |
+|---|---|---|---|---|
+| `full` | cookies + headers + cf_clearance | tidak (~30 menit) | sedang | scrape / replay request |
+| `cf_clearance` | cf_clearance saja | tidak (~30 menit) | kecil | inject ke client http |
+| `turnstile-min` | turnstile token | **ya** (~5 menit) | kecil | submit form bertoken |
+| `screenshot` | base64 PNG + cookies | per-request | besar | debug visual |
 
 ---
 
