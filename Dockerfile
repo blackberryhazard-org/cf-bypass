@@ -1,6 +1,5 @@
 FROM node:20-slim
 
-# install deps
 RUN apt-get update && apt-get install -y \
     chromium \
     fonts-liberation \
@@ -41,4 +40,3 @@ COPY . .
 EXPOSE 3000
 
 CMD ["node", "index.js"]
-

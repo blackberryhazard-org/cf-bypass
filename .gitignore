@@ -1,0 +1,6 @@
+node_modules/
+.chrome-profile/
+debug-*.png
+*.log
+.env
+core

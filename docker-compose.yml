@@ -1,16 +1,15 @@
 version: '3.8'
 
 services:
-  bycf:
+  cf-bypass:
     build: .
-    container_name: wesker bycf
+    container_name: cf-bypass
     restart: unless-stopped
     ports:
       - "3000:3000"
     environment:
-      - PORT=3000     # port
-      - AUTH_KEY=     # isi kalau mau pakai auth key
+      - PORT=3000
+      - AUTH_KEY=     # isi kalau mau pakai auth
     shm_size: '256mb'
     cap_add:
-      - SYS_ADMIN     # untuk Puppeteer di Docker
-      
+      - SYS_ADMIN
